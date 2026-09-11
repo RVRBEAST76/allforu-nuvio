@@ -61,21 +61,20 @@ function nfTryMirror(base) {
     },
     body: body
   }).then(function (r) {
-    mark("verify:" + r.status);
+    mark("V" + r.status);
     var sc = "";
     try {
       sc = r.headers.get("set-cookie") || r.headers.get("Set-Cookie") || "";
     } catch (e) {}
     return r.text().then(function (t) {
-      mark("body:" + String(t || "").replace(/\s+/g, " ").slice(0, 110));
       var m = sc.match(/t_hash_t=([^;]+)/i);
       if (m && m[1]) {
-        mark("cookie:ok@" + base.replace("https://", ""));
+        mark("CK:" + base.replace("https://", "").replace(".cc", ""));
         NF_BASE = base;
         NF_MOBILE = base + "/mobile";
         return decodeURIComponent(m[1]);
       }
-      mark("cookie:missing@" + base.replace("https://", ""));
+      mark("X" + base.replace("https://", "").replace(".cc", ""));
       throw new Error("no cookie@" + base);
     });
   });
@@ -108,7 +107,7 @@ function nfTitle(tmdbId, mediaType) {
   var kind = mediaType === "tv" ? "tv" : "movie";
   return nfJson("https://api.themoviedb.org/3/" + kind + "/" + encodeURIComponent(tmdbId) + "?api_key=" + tmdbKey())
     .then(function (m) {
-      mark("tmdb:" + (m && (m.title || m.name) || "null"));
+      mark("T:" + ((m && (m.title || m.name) || "?").slice(0, 18)));
       if (!m) throw new Error("tmdb null");
       var title = m.title || m.name || "";
       var date = m.release_date || m.first_air_date || "";
@@ -122,7 +121,7 @@ function nfSearch(title, tok) {
   return nfJson(NF_MOBILE + "/search.php?s=" + encodeURIComponent(title) + "&t=" + t, nfApiHeaders(tok))
     .then(function (d) {
       var list = d.searchResult || d.results || [];
-      mark("search:" + list.length);
+      mark("sr:" + list.length);
       if (!list.length) throw new Error("no results");
       var lc = title.toLowerCase();
       var best = null;
@@ -142,7 +141,7 @@ function nfFindEpisode(postId, seasonNum, episodeNum, tok) {
   var t = Math.floor(Date.now() / 1000);
   return nfJson(NF_MOBILE + "/post.php?id=" + encodeURIComponent(postId) + "&t=" + t, nfApiHeaders(tok))
     .then(function (d) {
-      mark("post:" + (d.type || "?") + "/" + ((d.episodes || []).length) + "ep");
+      mark("po:" + (d.type || "?") + "/" + ((d.episodes || []).length));
       if ((d.type || "") !== "t") return { playId: postId, title: d.title || d.t || "" };
       var eps = d.episodes || [];
       var found = findEp(eps, seasonNum, episodeNum);
@@ -206,7 +205,7 @@ function nfPlaylist(playId, title, tok) {
   };
   return nfJson(NF_MOBILE + "/playlist.php?id=" + encodeURIComponent(playId) + "&t=Watch&tm=" + tm, headers)
     .then(function (arr) {
-      mark("playlist:" + ((arr || []).length) + "rows");
+      mark("pl:" + ((arr || []).length));
       var out = [];
       (arr || []).forEach(function (o) {
         (o.sources || []).forEach(function (s) {
@@ -244,7 +243,7 @@ function nfPlaylist(playId, title, tok) {
 
 function getStreams(tmdbId, mediaType, seasonNum, episodeNum) {
   NF_TRACE = [];
-  mark("start:" + tmdbId + "/" + mediaType);
+  mark("S:" + tmdbId + "/" + mediaType);
   return nfTitle(tmdbId, mediaType)
     .then(function (meta) {
       if (!meta.title) return [];
@@ -263,9 +262,9 @@ function getStreams(tmdbId, mediaType, seasonNum, episodeNum) {
             });
           });
         })
-        .catch(function (e) { mark("ERR:" + (e && e.message || e)); return []; });
+        .catch(function (e) { mark("E:" + String((e && e.message) || e).slice(0, 24)); return []; });
     })
-    .catch(function (e) { mark("ERR:" + (e && e.message || e)); return []; })
+    .catch(function (e) { mark("E:" + String((e && e.message) || e).slice(0, 24)); return []; })
     .then(function (out) {
       if (out.length === 0 && NF_DEBUG) {
         return [{
