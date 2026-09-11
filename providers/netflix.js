@@ -11,7 +11,8 @@ function tmdbKey() {
   return "1865f43a0549ca50d341dd9ab8b29f49";
 }
 
-var NF_BASE = "https://net52.cc";
+var NF_MIRRORS = ["https://net52.cc", "https://net22.cc", "https://net27.cc", "https://net77.cc"];
+var NF_BASE = NF_MIRRORS[0];
 var NF_MOBILE = NF_BASE + "/mobile";
 var NF_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36";
 var NF_DEBUG = true;
@@ -41,17 +42,17 @@ function nfUuid() {
 }
 
 /* Step 1: bypass -> t_hash_t cookie (manual cookie handling for sandbox fetch) */
-function nfBypass() {
+function nfTryMirror(base) {
   var body = "g-recaptcha-response=" + nfUuid();
-  return nfFetch(NF_BASE + "/verify.php", {
+  return nfFetch(base + "/verify.php", {
     method: "POST",
     headers: {
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       "Accept-Language": "en-US,en;q=0.9",
       "Cache-Control": "max-age=0",
       "Content-Type": "application/x-www-form-urlencoded",
-      Origin: "https://net52.cc",
-      Referer: "https://net52.cc/verify2",
+      Origin: base,
+      Referer: base + "/verify2",
       "Sec-Fetch-Dest": "document",
       "Sec-Fetch-Mode": "navigate",
       "Sec-Fetch-Site": "same-origin",
@@ -68,11 +69,26 @@ function nfBypass() {
     return r.text().then(function (t) {
       mark("body:" + String(t || "").replace(/\s+/g, " ").slice(0, 110));
       var m = sc.match(/t_hash_t=([^;]+)/i);
-      if (m && m[1]) { mark("cookie:ok"); return decodeURIComponent(m[1]); }
-      mark("cookie:missing");
-      throw new Error("no cookie");
+      if (m && m[1]) {
+        mark("cookie:ok@" + base.replace("https://", ""));
+        NF_BASE = base;
+        NF_MOBILE = base + "/mobile";
+        return decodeURIComponent(m[1]);
+      }
+      mark("cookie:missing@" + base.replace("https://", ""));
+      throw new Error("no cookie@" + base);
     });
   });
+}
+
+function nfBypass() {
+  var i = 0;
+  function next() {
+    if (i >= NF_MIRRORS.length) throw new Error("no cookie");
+    var b = NF_MIRRORS[i++];
+    return nfTryMirror(b).catch(function () { return next(); });
+  }
+  return next();
 }
 
 function nfCookieHeader(tok) {
