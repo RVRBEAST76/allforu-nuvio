@@ -46,16 +46,26 @@ function nfBypass() {
   return nfFetch(NF_BASE + "/verify.php", {
     method: "POST",
     headers: {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "max-age=0",
       "Content-Type": "application/x-www-form-urlencoded",
       Origin: "https://net52.cc",
-      Referer: "https://net52.cc/verify2"
+      Referer: "https://net52.cc/verify2",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "same-origin",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1"
     },
     body: body
   }).then(function (r) {
+    mark("verify:" + r.status);
     var sc = "";
     try {
       sc = r.headers.get("set-cookie") || r.headers.get("Set-Cookie") || "";
     } catch (e) {}
+    mark("setcookie:" + (sc ? sc.length + "chars" : "empty"));
     var m = sc.match(/t_hash_t=([^;]+)/i);
     if (m && m[1]) { mark("cookie:ok"); return decodeURIComponent(m[1]); }
     mark("cookie:missing");
