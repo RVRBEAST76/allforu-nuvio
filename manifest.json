@@ -5,7 +5,7 @@
     {
       "id": "allforu-netflix",
       "name": "AllForU Netflix",
-      "description": "Netflix mirror - Movies & Series in Tamil, English, Hindi & more",
+      "description": "Netflix mirror (PAUSED - source bot-blocks app requests, use CloudStream plugin)",
       "version": "1.0.8",
       "author": "AllForU",
       "supportedTypes": [
@@ -13,7 +13,7 @@
         "tv"
       ],
       "filename": "providers/netflix.js",
-      "enabled": true,
+      "enabled": false,
       "formats": [
         "m3u8",
         "mp4"
