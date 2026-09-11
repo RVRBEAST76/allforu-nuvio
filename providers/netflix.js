@@ -42,23 +42,11 @@ function nfUuid() {
 }
 
 /* Step 1: bypass -> t_hash_t cookie (manual cookie handling for sandbox fetch) */
-function nfTryMirror(base) {
+function nfPostVerify(base, headers) {
   var body = "g-recaptcha-response=" + nfUuid();
   return nfFetch(base + "/verify.php", {
     method: "POST",
-    headers: {
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
-      "Cache-Control": "max-age=0",
-      "Content-Type": "application/x-www-form-urlencoded",
-      Origin: base,
-      Referer: base + "/verify2",
-      "Sec-Fetch-Dest": "document",
-      "Sec-Fetch-Mode": "navigate",
-      "Sec-Fetch-Site": "same-origin",
-      "Sec-Fetch-User": "?1",
-      "Upgrade-Insecure-Requests": "1"
-    },
+    headers: headers,
     body: body
   }).then(function (r) {
     mark("V" + r.status);
@@ -76,6 +64,27 @@ function nfTryMirror(base) {
       }
       mark("X" + base.replace("https://", "").replace(".cc", ""));
       throw new Error("no cookie@" + base);
+    });
+  });
+}
+
+function nfTryMirror(base) {
+  return nfPostVerify(base, {
+    "Content-Type": "application/x-www-form-urlencoded"
+  }).catch(function () {
+    mark("min-fail@" + base.replace("https://", "").replace(".cc", ""));
+    return nfPostVerify(base, {
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "max-age=0",
+      "Content-Type": "application/x-www-form-urlencoded",
+      Origin: base,
+      Referer: base + "/verify2",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "same-origin",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1"
     });
   });
 }
