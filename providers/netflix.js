@@ -65,11 +65,13 @@ function nfBypass() {
     try {
       sc = r.headers.get("set-cookie") || r.headers.get("Set-Cookie") || "";
     } catch (e) {}
-    mark("setcookie:" + (sc ? sc.length + "chars" : "empty"));
-    var m = sc.match(/t_hash_t=([^;]+)/i);
-    if (m && m[1]) { mark("cookie:ok"); return decodeURIComponent(m[1]); }
-    mark("cookie:missing");
-    throw new Error("no cookie");
+    return r.text().then(function (t) {
+      mark("body:" + String(t || "").replace(/\s+/g, " ").slice(0, 110));
+      var m = sc.match(/t_hash_t=([^;]+)/i);
+      if (m && m[1]) { mark("cookie:ok"); return decodeURIComponent(m[1]); }
+      mark("cookie:missing");
+      throw new Error("no cookie");
+    });
   });
 }
 
