@@ -6,14 +6,26 @@
       "id": "allforu-netflix",
       "name": "AllForU Netflix",
       "description": "Netflix mirror - Movies & Series in Tamil, English, Hindi & more",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": "AllForU",
-      "supportedTypes": ["movie", "tv"],
+      "supportedTypes": [
+        "movie",
+        "tv"
+      ],
       "filename": "providers/netflix.js",
       "enabled": true,
-      "formats": ["m3u8", "mp4"],
+      "formats": [
+        "m3u8",
+        "mp4"
+      ],
       "logo": "https://raw.githubusercontent.com/RVRBEAST76/allforu-repo/main/allforu-logo.jpg",
-      "contentLanguage": ["ta", "en", "hi", "te", "ml"]
+      "contentLanguage": [
+        "ta",
+        "en",
+        "hi",
+        "te",
+        "ml"
+      ]
     }
   ]
 }

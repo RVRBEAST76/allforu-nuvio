@@ -3,22 +3,24 @@
  * Promise-only (no async/await). Works with plain fetch.
  */
 
-// Free key from https://www.themoviedb.org (replace with your own if rate-limited)
-var TMDB_API_KEY = "1865f43a0549ca50d341dd9ab8b29f49";
+// Free key from https://www.themoviedb.org (Nuvio also injects its own key natively)
+function tmdbKey() {
+  try {
+    if (typeof globalThis !== "undefined" && globalThis.TMDB_API_KEY) return globalThis.TMDB_API_KEY;
+  } catch (e) {}
+  return "1865f43a0549ca50d341dd9ab8b29f49";
+}
 
 var NF_BASE = "https://net52.cc";
 var NF_MOBILE = NF_BASE + "/mobile";
 var NF_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36";
 
 function nfFetch(url, opts) {
+  // NOTE: no setTimeout here (sandbox may not provide timers) - native fetch has its own timeouts
   opts = opts || {};
   opts.headers = opts.headers || {};
   if (!opts.headers["User-Agent"]) opts.headers["User-Agent"] = NF_UA;
-  var timeout = new Promise(function (_, reject) {
-    setTimeout(function () { reject(new Error("timeout")); }, opts.timeoutMs || 15000);
-  });
-  delete opts.timeoutMs;
-  return Promise.race([fetch(url, opts), timeout]);
+  return fetch(url, opts);
 }
 
 function nfJson(url, headers) {
@@ -72,7 +74,7 @@ function nfApiHeaders(tok) {
 /* Step 2: tmdbId -> title/year via TMDB */
 function nfTitle(tmdbId, mediaType) {
   var kind = mediaType === "tv" ? "tv" : "movie";
-  return nfJson("https://api.themoviedb.org/3/" + kind + "/" + encodeURIComponent(tmdbId) + "?api_key=" + TMDB_API_KEY)
+  return nfJson("https://api.themoviedb.org/3/" + kind + "/" + encodeURIComponent(tmdbId) + "?api_key=" + tmdbKey())
     .then(function (m) {
       var title = m.title || m.name || "";
       var date = m.release_date || m.first_air_date || "";
