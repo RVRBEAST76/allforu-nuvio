@@ -1,4 +1,4 @@
-/** AllForU moviebox provider for Nuvio — built 2026-09-17T05:48:28.684Z */
+/** AllForU moviebox provider for Nuvio — built 2026-09-17T06:25:02.601Z */
 
 "use strict";
 
@@ -321,25 +321,27 @@ function newTvPlayer(apiBase, playId, token, ott) {
   }).then(function (r) { return r.json(); }).catch(function () { return null; });
 }
 
-/* Returns a stream object or null. */
-function newTvStream(playId, label, ott) {
+/* Returns a stream object or null. `fallbackToken` (the net52 session cookie)
+ * is used when the OTP endpoint returns nothing — the player then reports
+ * status "ok" instead of serving a 10-minute placeholder. */
+function newTvStream(playId, label, ott, fallbackToken) {
   return resolveNewTvApi().then(function (api) {
     if (!api) return null;
     return newTvOtp(api).then(function (otp) {
-      var token = otp || "";
+      var token = otp || fallbackToken || "";
       return newTvPlayer(api, playId, token, ott).then(function (root) {
         if (root && root.status === "otp") {
           return newTvOtp(api).then(function (otp2) {
-            token = otp2 || token;
+            token = otp2 || fallbackToken || token;
             return newTvPlayer(api, playId, token, ott);
           });
         }
         return root;
       }).then(function (r) {
-        // The NewTV player sometimes reports status "otp" yet still returns a
-        // valid video_link (direct CDN, no rate-limit). Accept any non-empty
-        // link instead of requiring status === "ok".
-        var link = r ? (r.video_link || "") : "";
+        // Only trust a real feature stream. status "ok" is the reliable signal;
+        // status "otp" means the token was rejected (returns a 10-min sample).
+        var ok = r && r.status === "ok";
+        var link = ok ? (r.video_link || "") : "";
         if (!link) return null;
         var low = link.toLowerCase();
         if (low.indexOf("sample") >= 0 || low.indexOf("trailer") >= 0 ||

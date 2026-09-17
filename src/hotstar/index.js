@@ -98,7 +98,7 @@ function getStreams(tmdbId, mediaType, seasonNum, episodeNum) {
         var postId = item.id || "";
         if (!postId) throw new Error("no-id");
         return hsResolvePlayId(sess, postId, mediaType, season, episode).then(function (playId) {
-          return newTvStream(playId, HS_LABEL, HS_OTT).then(function (stream) {
+          return newTvStream(playId, HS_LABEL, HS_OTT, sess.token).then(function (stream) {
             if (stream) {
               stream.name = HS_LABEL + " · " + (stream.quality || "HD");
               return [stream];
