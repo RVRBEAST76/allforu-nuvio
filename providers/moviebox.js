@@ -1,4 +1,4 @@
-/** AllForU moviebox provider for Nuvio — built 2026-09-17T05:02:02.103Z */
+/** AllForU moviebox provider for Nuvio — built 2026-09-17T05:48:28.684Z */
 
 "use strict";
 
@@ -291,6 +291,9 @@ function newTvOtp(apiBase) {
     },
   }).then(function (r) { return r.text(); })
     .then(function (t) {
+      // Newer endpoints return JSON: {"otp":"..."} ; older return JS const otp=[...]
+      var jm = t.match(/"otp"\s*:\s*"([^"]+)"/);
+      if (jm && jm[1]) return jm[1];
       var m = t.match(/const\s+otp\s*=\s*\[(.*?)\]/m);
       if (!m) return null;
       var parts = m[1].split(",");
@@ -333,7 +336,10 @@ function newTvStream(playId, label, ott) {
         }
         return root;
       }).then(function (r) {
-        var link = r && r.status === "ok" ? (r.video_link || "") : "";
+        // The NewTV player sometimes reports status "otp" yet still returns a
+        // valid video_link (direct CDN, no rate-limit). Accept any non-empty
+        // link instead of requiring status === "ok".
+        var link = r ? (r.video_link || "") : "";
         if (!link) return null;
         var low = link.toLowerCase();
         if (low.indexOf("sample") >= 0 || low.indexOf("trailer") >= 0 ||
