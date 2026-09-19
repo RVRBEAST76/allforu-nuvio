@@ -222,7 +222,56 @@ function normTitle(s) {
   return String(s || "").toLowerCase().split("[")[0].replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function mboxStreams(pi) {
+var LANG_NAMES = {
+  en: "English", hi: "Hindi", ta: "Tamil", te: "Telugu", ml: "Malayalam", kn: "Kannada",
+  bn: "Bengali", mr: "Marathi", pa: "Punjabi", gu: "Gujarati", ur: "Urdu",
+  es: "Spanish", esla: "Spanish (LatAm)", pt: "Portuguese", ptbr: "Portuguese (BR)",
+  fr: "French", de: "German", it: "Italian", ja: "Japanese", ko: "Korean",
+  zh: "Chinese", ar: "Arabic", ru: "Russian", tr: "Turkish", id: "Indonesian",
+  vi: "Vietnamese", th: "Thai", fil: "Filipino", fa: "Persian"
+};
+
+/* "Original Audio"/"Hindi dub" -> display name like "English (Original)" / "Hindi". */
+function langLabel(lanName, lanCode, original) {
+  var code = String(lanCode || "").toLowerCase();
+  var raw = String(lanName || "").trim();
+  var isOriginal = !!original || /original/i.test(raw);
+  var name = raw.replace(/\s*dub\s*$/i, "").replace(/^original\s*audio$/i, "").trim();
+  var mapped = LANG_NAMES[name.toLowerCase()];
+  if (!name || mapped) {
+    name = mapped || LANG_NAMES[code] || (code ? code.charAt(0).toUpperCase() + code.slice(1) : "Original");
+  }
+  if (isOriginal) name += " (Original)";
+  return name;
+}
+
+function fmtSize(bytes) {
+  if (!bytes || bytes < 1024) return "Unknown";
+  var gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 0.1) return gb.toFixed(gb >= 10 ? 0 : 1) + " GB";
+  return (bytes / (1024 * 1024)).toFixed(0) + " MB";
+}
+
+/* Every language is a separate subjectId in `dubs`; it returns its own streams.
+ * Collect them all (including the picked subject itself) with a display label. */
+function mboxDubList(info) {
+  var data = (info && info.data) || {};
+  var out = [], seen = {};
+  (data.dubs || []).forEach(function (x) {
+    var sid = x && x.subjectId ? String(x.subjectId) : "";
+    if (!sid || seen[sid]) return;
+    seen[sid] = 1;
+    out.push({ sid: sid, lang: langLabel(x.lanName, x.lanCode, x.original) });
+  });
+  var selfId = String(data.subjectId || "");
+  if (selfId && !seen[selfId]) {
+    // The picked subject may be a dub itself; don't force "(Original)" on it.
+    out.unshift({ sid: selfId, lang: langLabel(data.lanName, data.lanCode, false) });
+  }
+  return out;
+}
+
+function mboxStreams(pi, lang) {
   var out = [];
   var streams = (pi && pi.data && pi.data.streams) || [];
   for (var i = 0; i < streams.length; i++) {
@@ -242,35 +291,65 @@ function mboxStreams(pi) {
     var headers = { Referer: MBOX_BASE, "User-Agent": FILE_UA };
     if (sign) headers["Cookie"] = sign;
     out.push({
-      name: "AllForU MovieBox",
-      title: q,
+      name: "AllForU MovieBox" + (lang ? " · " + lang : ""),
+      title: q + (lang ? " · " + lang : ""),
       url: url,
       quality: q,
-      size: "Unknown",
+      language: lang || "",
+      size: fmtSize(size),
       headers: headers,
       provider: "allforu-moviebox",
+      _claimed: size,
+      _isDash: !!dash,
     });
   }
   return out;
 }
 
-function mboxTryCombos(sids, combos, token) {
+/* For one language pack, try each se/ep combo until it yields streams. */
+function mboxDubStreams(dub, combos, token) {
+  var idx = 0;
+  function attempt() {
+    if (idx >= combos.length) return Promise.resolve([]);
+    var combo = combos[idx++];
+    return mboxPlayInfo(dub.sid, combo[0], combo[1], token).then(function (pi) {
+      var list = mboxStreams(pi, dub.lang);
+      if (list.length) return list;
+      return attempt();
+    }).catch(function () { return attempt(); });
+  }
+  return attempt();
+}
+
+function mboxTryCombos(dubs, combos, token) {
   var seen = {}, merged = [];
   var chain = Promise.resolve();
-  sids.slice(0, 3).forEach(function (sid) {
-    combos.forEach(function (combo) {
-      chain = chain.then(function () {
-        return mboxPlayInfo(sid, combo[0], combo[1], token).then(function (pi) {
-          mboxStreams(pi).forEach(function (s) {
-            if (!seen[s.url]) { seen[s.url] = 1; merged.push(s); }
-          });
+  dubs.slice(0, 12).forEach(function (dub) {
+    chain = chain.then(function () {
+      return mboxDubStreams(dub, combos, token).then(function (list) {
+        list.forEach(function (s) {
+          // Dedup per language — every language shares the same raw .mp4 URL,
+          // so deduping by URL alone would collapse all audio tracks into one.
+          var key = (s.language || "") + "|" + s.url;
+          if (!seen[key]) { seen[key] = 1; merged.push(s); }
         });
       });
     });
   });
   return chain.then(function () {
-    merged.sort(function (a, b) { return parseInt(b.title, 10) - parseInt(a.title, 10); });
-    return merged;
+    // Real per-language streams are CloudFront-signed DASH. Some dubs have no
+    // signature and fall back to a shared, generic .mp4 placeholder, so when at
+    // least one signed track exists, drop the unsigned decoys entirely.
+    var hasDash = false;
+    for (var i = 0; i < merged.length; i++) { if (merged[i]._isDash) { hasDash = true; break; } }
+    var final = merged.filter(function (s) { return !hasDash || s._isDash; });
+    final.forEach(function (s) { delete s._claimed; delete s._isDash; });
+    final.sort(function (a, b) {
+      var la = (a.language || "").toLowerCase(), lb = (b.language || "").toLowerCase();
+      if (la !== lb) return la < lb ? -1 : 1;
+      return parseInt(b.quality, 10) - parseInt(a.quality, 10);
+    });
+    return final;
   });
 }
 
@@ -341,21 +420,15 @@ function getStreams(tmdbId, mediaType, seasonNum, episodeNum) {
 
         if (!isSeries) {
           return mboxGetInfo(sid, token).catch(function () { return {}; }).then(function (groot) {
-            var sids = [sid];
-            (((groot || {}).data || {}).dubs || []).forEach(function (d) {
-              var dsid = d && d.subjectId ? String(d.subjectId) : "";
-              if (dsid && sids.indexOf(dsid) < 0) sids.push(dsid);
-            });
-            return mboxTryCombos(sids, [[1, 1], [0, 0]], token);
+            var dubs = mboxDubList(groot);
+            if (!dubs.length) dubs = [{ sid: sid, lang: "Original" }];
+            return mboxTryCombos(dubs, [[1, 1], [0, 0]], token);
           });
         }
         return mboxGetInfo(sid, token).then(function (groot) {
-          var sids = [sid];
-          (((groot || {}).data || {}).dubs || []).forEach(function (d) {
-            var dsid = d && d.subjectId ? String(d.subjectId) : "";
-            if (dsid && sids.indexOf(dsid) < 0) sids.push(dsid);
-          });
-          return mboxTryCombos(sids, [[season, episode], [0, 0], [1, 1]], token);
+          var dubs = mboxDubList(groot);
+          if (!dubs.length) dubs = [{ sid: sid, lang: "Original" }];
+          return mboxTryCombos(dubs, [[season, episode], [0, 0], [1, 1]], token);
         });
       });
     });
