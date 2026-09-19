@@ -15,7 +15,6 @@ function stripExports(code) {
 }
 
 const md5 = stripExports(read(path.join(src, "_md5.js")));
-const net52 = stripExports(read(path.join(src, "_net52.js")));
 
 const providers = fs.readdirSync(src, { withFileTypes: true })
   .filter((d) => d.isDirectory())
@@ -30,7 +29,6 @@ for (const name of providers) {
     "/** AllForU " + name + " provider for Nuvio — built " + new Date().toISOString() + " */",
     '"use strict";',
     md5,
-    net52,
     provider,
   ].join("\n\n");
   const dest = path.join(out, name + ".js");

@@ -1,4 +1,4 @@
-# AllForU — Nuvio Local Scraper
+# AllForU — Nuvio Scraper
 
 MovieBox streams for the **Nuvio** app. No server, no extra app — Nuvio runs the
 JavaScript directly on your device.
